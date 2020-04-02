@@ -18,5 +18,13 @@
     <ClCompile Include="Graduation.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="STA.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="STA.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

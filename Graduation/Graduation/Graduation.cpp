@@ -3,65 +3,62 @@
 //时间间隔序列T呈指数分布
 //假设共有100个时间周期
 #include <iostream>
-#include <random>
-#include <vector>
+#include "STA.h"
 
-void initset() { //数据量的设定
-	std::default_random_engine randrom;//随机数引擎
-	enum channel_space
-	{
-		cs1 = 5,
-		cs2 = 10,
-		cs3 = 20
-	};
-	struct speed
-	{
-		int mcs;
-		channel_space cs;
-	};
-	double lambda1, lambda2;
-	const int number = 10;//暂时假设共有10个时间间隔,也可以设为变量
-	int num_rt;
-	std::vector<std::vector<double>> time_gap;
-	std::vector<std::vector<int>> num_info;
-	std::uniform_real_distribution<double> distribution_un(1, 10);
-
-	//std::cin >> num_rt;//RT数量
-	num_rt = 10;
-	for (int i = 0; i < num_rt; ++i) {
-		lambda1 = distribution_un(randrom);
-		std::exponential_distribution<double> distribution_ex(lambda1);//时间间隔符合参数为lambda1的指数分布
-		std::vector<double> time_tmp;
-		for (int j = 0; j < number; ++j) {
-			double num_rand = distribution_ex(randrom);
-			time_tmp.push_back(num_rand);
-		}
-		time_gap.push_back(time_tmp);
-		time_tmp.clear();
+int getmaxprivity(std::vector<STA*> &sta_info) {
+	double max_privity = 0.0;
+	int max = -1;
+	for (int i = 0; i < sta_info.size(); ++i) {
+		STA *tmp = sta_info[i];
+		double privity = tmp->get_privity();
+		privity > max_privity ? max_privity = privity, max = i : max = max, max_privity = max_privity;
 	}
-
-	for (int i = 0; i < num_rt; ++i) {
-		lambda2 = distribution_un(randrom);
-		std::vector<int> num_tmp;
-		std::vector<double> time_tmp = time_gap[i];
-		for (int j = 0; j < number; ++j) {
-			double lambda = lambda2 * time_tmp[j] * 100;
-			std::poisson_distribution<int> distribution_po(lambda);//时间间隔t内的数据量符合参数为lambda2*t的泊松分布
-			double num_rand = distribution_po(randrom);
-			num_tmp.push_back(num_rand);
-		}
-		num_info.push_back(num_tmp);
-		num_tmp.clear();
-	}
-	for (int i = 0; i < time_gap.size(); ++i) {
-		for (int j = 0; j < time_gap[i].size(); ++j) {
-			std::cout << "RT" << i << "-gap" << j << ":" << time_gap[i][j]
-				<< " 数据量: " << num_info[i][j] << std::endl;
-		}
-	}
+	return max;
 }
 int main() {
-	initset();
+	int sta_num = 50;
+	std::vector<STA*> sta_info;
+	for (int i = 0; i < sta_num; ++i) {
+		STA *sta = new STA();
+		sta->produce_info();
+		sta_info.push_back(sta);
+	}
+	/*轮询调度最大吞吐量优化*/
+	/*
+	//每次调度15个sta，确认每次调度的sta编号如下
+	int start = 0;
+	int end = 14;
+	int time = 20;//假设一共调度20次
+	while (time--) {
+		if (start < end) {
+			//优化目标--比例公平
+			for (int j = start; j < end; ++j)
+				std::cout << j << ' ';
+			std::cout << std::endl;
+		}
+		else {
+			for(int j = start; j < 20; ++j)
+				std::cout << j << ' ';
+			for(int j = 0; j < end; ++j)
+				std::cout << j << ' ';
+			std::cout << std::endl;
+		}
+		start = (start + 15) % 20;
+		end = (end + 15) % 20;
+	}*/
+	/*轮询调度比例公平优化目标*/
+	/*
+	比例公平调度不考虑时延
+	每次调度一个调度周期t
+	*/
+	//用此时速度/以往平均速度作为优先级调度
+	int time = 150;
+	while (time--) {
+		int id = getmaxprivity(sta_info);
+		sta_info[id]->get_dispach();
+		std::cout << "第" << 150 - time << "次调度id-" << id << std::endl;
+	}
+	/*比例公平调度最大吞吐量分配资源*/
 	return 0;
 }
 

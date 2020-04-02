@@ -152,6 +152,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Graduation.cpp" />
+    <ClCompile Include="STA.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="STA.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
