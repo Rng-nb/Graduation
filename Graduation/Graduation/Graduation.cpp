@@ -1,51 +1,23 @@
 ﻿#include "STA.h"
 #include <map>
 
-//获取优先级最高的STA id
-int getmaxprivity(std::vector<STA*> &sta_info, int timenow) {
-	double max_privity = 0.0;
-	int max = -1;
-	for (int i = 0; i < sta_info.size(); ++i) {
-		STA *tmp = sta_info[i];
-		double privity = tmp->getPrivity_f1(timenow);
-		privity > max_privity ? max_privity = privity, max = i : max = max, max_privity = max_privity;
-	}
-	return max;
-}
 /*
 	比例公平调度不考虑时延
 	每次调度一个调度周期t
 */
-//用此时 速度/以往平均速度 作为优先级调度
-void function1(std::vector<STA*> &sta_info) {
-	std::ofstream out("tun.txt");
-	int time = 150;
-	double cost_sum = 0;
-	int info_sum = 0;
-	std::vector<double> speed;
-	while (time--) {
-		int id = getmaxprivity(sta_info,150 - time);
-		std::cout << "第" << 150 - time << "次调度id-" << id << std::endl;
-		sta_info[id]->getDispach_f1();
-		cost_sum += sta_info[id]->info_dispached.back().time;//ms
-		info_sum += sta_info[id]->info_dispached.back().info_num;
-		std::cout << "吞吐量：" << info_sum * 512.0 * 8.0 / (cost_sum / 1000.0) / 1000000 << "Mb/s"<< std::endl;
-		out << "吞吐量：" << info_sum * 512.0 * 8.0 / (cost_sum / 1000.0) / 1000000 << "Mb/s"<< std::endl;
-		
-		speed.push_back(sta_info[id]->info_dispached.back().info_speed);
-		int m = speed.size();
-		double speedsum_x = 0.0;
-		double speedsum_xx = 0.0;
-		for (int i = 0; i < m; ++i) {
-			speedsum_x += speed[i];
-			speedsum_xx += speed[i] * speed[i];
-		}
-		std::cout << "Jain：" << speedsum_x * speedsum_x / (m * 1.0) / speedsum_xx << std::endl;
-	} 
+//获得一个优先级
+void getPrivity_PF(std::vector<STA*> &sta_info, std::vector<std::pair<int, double> > &privity, int timenow, int i) {
+	int j = 0;
+	double privity_tmp = sta_info[i]->getPrivity_f1(timenow);
+	for (j = 0; j < privity.size(); ++j) {
+		if (privity_tmp > privity[j].second)
+			break;
+	}
+	privity.insert(privity.begin() + j, std::pair<int, double>(i, privity_tmp));
 }
-
-void function2(std::vector<STA*> &sta_info) {
-	std::vector<std::pair<int, double>> priority;//存储一次调度的各个优先级
+//比例公平调度 比例公平优化
+void function1(std::vector<STA*> &sta_info) {
+	std::vector<std::pair<int, double>> privity;//存储一次调度的各个优先级
 	std::vector<int> dispach_id;//存储一个调度选择的id
 	std::vector<double> speed;
 	int time = 150;
@@ -53,23 +25,18 @@ void function2(std::vector<STA*> &sta_info) {
 	int info_sum = 0;
 	while (time--) {
 		std::cout << "第" << 150 - time << "次调度" << std::endl;
-		for (int i = 0; i < sta_info.size(); ++i) {
-			double priority_tmp = sta_info[i]->getPrivity_f1(150 - time);
-			int j = 0;
-			for (j = 0; j < priority.size(); ++j) {
-				if (priority_tmp > priority[j].second)
-					break;
-			}
-			priority.insert(priority.begin() + j, std::pair<int, double>(i, priority_tmp));
-		}
+		for(int i = 0; i < sta_info.size(); ++i)
+			getPrivity_PF(sta_info,privity,150 - time,i);
+		for (int i = 0; i < privity.size(); ++i) 
+			std::cout << "id =" << privity[i].first << " privity= " << privity[i].second << std::endl;
 		//选择优先级最高的5个调度
-		for (int i = 0; i < priority.size() && i < 5; ++i) {
-			dispach_id.push_back(priority[i].first);
+		for (int i = 0; i < privity.size() && i < 5; ++i) {
+			dispach_id.push_back(privity[i].first);
 		}
 		//调度，每次调度的最小时间单位为1ms,剩下时间优先满足高优先级
 		double timeleft = 5.0;
 		for (int i = 0; i < dispach_id.size(); ++i) {
-			sta_info[dispach_id[i]]->getDispach_f2(timeleft);
+			sta_info[dispach_id[i]]->getDispach(timeleft);
 			cost_sum += sta_info[dispach_id[i]]->info_dispached.back().time;//ms
 			info_sum += sta_info[dispach_id[i]]->info_dispached.back().info_num;
 			speed.push_back(sta_info[dispach_id[i]]->info_dispached.back().info_speed);
@@ -84,14 +51,13 @@ void function2(std::vector<STA*> &sta_info) {
 			speedsum_xx += speed[i] * speed[i];
 		}
 		std::cout << "Jain：" << speedsum_x * speedsum_x / (m * 1.0) / speedsum_xx << std::endl;
-		priority.clear();
+		privity.clear();
 		dispach_id.clear();
 	}
 }
 /*轮询调度比例公平优化*/
-//每次调度30个sta，确认每次调度的sta编号如下
-void function3(std::vector<STA*> &sta_info) {
-	std::vector<std::pair<int, double>> priority;//存储一次调度的各个优先级
+void function2(std::vector<STA*> &sta_info) {
+	std::vector<std::pair<int, double>> privity;//存储一次调度的各个优先级
 	std::vector<int> dispach_id;//存储一个调度选择的id
 	std::vector<double> speed;
 	int start = 0;
@@ -102,43 +68,22 @@ void function3(std::vector<STA*> &sta_info) {
 	while (time--) {
 		if (start < end) {
 			//优化目标--比例公平
-			for (int i = start; i < end; ++i) {
-				double priority_tmp = sta_info[i]->getPrivity_f1(150 - time);
-				int j = 0;
-				for (j = 0; j < priority.size(); ++j) {
-					if (priority_tmp > priority[j].second)
-						break;
-				}
-				priority.insert(priority.begin() + j, std::pair<int, double>(i, priority_tmp));
-			}
+			for (int i = start; i < end; ++i)
+				getPrivity_PF(sta_info, privity, 150 - time, i);
 		}
 		else {
-			for (int i = start; i < 50; ++i) {
-				double priority_tmp = sta_info[i]->getPrivity_f1(150 - time);
-				int j = 0;
-				for (j = 0; j < priority.size(); ++j) {
-					if (priority_tmp > priority[j].second)
-						break;
-				}
-				priority.insert(priority.begin() + j, std::pair<int, double>(i, priority_tmp));
-			}
-			for (int i = 0; i < end; ++i) {
-				double priority_tmp = sta_info[i]->getPrivity_f1(150 - time);
-				int j = 0;
-				for (j = 0; j < priority.size(); ++j) {
-					if (priority_tmp > priority[j].second)
-						break;
-				}
-				priority.insert(priority.begin() + j, std::pair<int, double>(i, priority_tmp));
-			}
+			for (int i = start; i < 50; ++i) 
+				getPrivity_PF(sta_info, privity, 150 - time, i);
+			for (int i = 0; i < end; ++i) 
+				getPrivity_PF(sta_info, privity, 150 - time, i);
 		}
-		for (int i = 0; i < priority.size() && i < 5; ++i) {
-			dispach_id.push_back(priority[i].first);
+		for (int i = 0; i < privity.size() && i < 5; ++i) {
+			dispach_id.push_back(privity[i].first);
 		}
 		//调度，每次调度的最小时间单位为1ms,剩下时间优先满足高优先级
 		double timeleft = 5.0;
 		for (int i = 0; i < dispach_id.size(); ++i) {
-			sta_info[dispach_id[i]]->getDispach_f2(timeleft);
+			sta_info[dispach_id[i]]->getDispach(timeleft);
 			cost_sum += sta_info[dispach_id[i]]->info_dispached.back().time;//ms
 			info_sum += sta_info[dispach_id[i]]->info_dispached.back().info_num;
 			speed.push_back(sta_info[dispach_id[i]]->info_dispached.back().info_speed);
@@ -154,7 +99,7 @@ void function3(std::vector<STA*> &sta_info) {
 		std::cout << "Jain：" << speedsum_x * speedsum_x / (m * 1.0) / speedsum_xx << std::endl;
 		start = (start + 5) % 50;
 		end = (end + 5) % 50;
-		priority.clear();
+		privity.clear();
 		dispach_id.clear();
 	}
 }
@@ -178,11 +123,9 @@ int main() {
 		data << std::endl;
 	}
 
-	std::cout << "调度1：" << std::endl;
+	std::cout << "比例公平调度：" << std::endl;
 	function1(sta_info);
-	//std::cout << "调度2：" << std::endl;
-	//function2(sta_info);
-	//std::cout << "调度3：" << std::endl;
-	//function3(sta_info);
+	std::cout << "轮询调度：" << std::endl;
+	function2(sta_info);
 	return 0;
 }

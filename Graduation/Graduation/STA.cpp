@@ -2,7 +2,7 @@
 
 STA::STA()
 {
-	std::uniform_real_distribution<double> random_un(1,20);//1-20均匀分布的随机double
+	std::uniform_real_distribution<double> random_un(1,5);//1-5均匀分布的随机double
 	lambda_ex_time = random_un(random);//设定一个随机的初始λ值
 	lambda_po_info = random_un(random);//设定一个随机的初始λ值
 	channel_space = 5;
@@ -22,7 +22,7 @@ void STA::produceInfo()
 		std::exponential_distribution<double> random_time(lambda_ex_time);//时间间隔符合参数为lambda1的指数分布
 		double time_rand = random_time(random);//随机一个时间间隔
 
-		double lambda = lambda_po_info * time_rand * 1000; //λt呈泊松分布ms为单位
+		double lambda = lambda_po_info * time_rand * 1000; //λt呈泊松分布
 		std::poisson_distribution<int> random_info(lambda);//时间间隔t内的数据量符合参数为lambda2*t的泊松分布
 		int info_rand = random_info(random);//随机一个数据包数量
 		
@@ -30,7 +30,7 @@ void STA::produceInfo()
 		channel_speed = speed[random_un(random) - 1] * (channel_space / 5.0);
 
 		Info info_tmp; //存储产生的一次随机信息
-		flag_first == true ? info_tmp.time = 0.0, flag_first = false : info_tmp.time = time_tmp + time_rand * 1000, time_tmp += time_rand * 1000;
+		flag_first == true ? info_tmp.time = 0.0, flag_first = false : info_tmp.time = time_tmp + time_rand * 10, time_tmp += time_rand * 10;
 		info_tmp.info_speed = channel_speed * 4;
 		info_tmp.info_num = info_rand;
 		info_produce.push_back(info_tmp);
@@ -56,9 +56,9 @@ double STA::getPrivity_f1(int timenow)
 		double sum_time = 0.0;
 		for (int j = 0; j < info_dispached.size(); ++j) {
 			sum_info += info_dispached[j].info_num;
-			sum_time += (double)(info_dispached[j].info_num * 512.0 * 8.0 / 1000000.0) / info_dispached[j].info_speed;
+			sum_time += info_dispached[j].time;
 		}
-		privity = speed_now / (sum_info * 1.0 / sum_time);
+		privity = speed_now * 1000.0 / (sum_info * 1.0 / sum_time);
 	}
 	return privity;
 }
@@ -71,41 +71,7 @@ double STA::getPrivity_f2(int timenow)
 	return privity;
 }
 
-void STA::getDispach_f1()//一个调度周期10ms,分配传输时间为9ms，1ms为控制时隙
-{
-	Info info_tmp;
-	Info dispached;
-	info_tmp = info_produce.front();
-	info_produce.pop_front();
-	dispached.info_speed = info_tmp.info_speed;
-	int num_trans = (int)info_tmp.info_speed * 1000000.0 * 0.009 / 8.0 / 512.0;//计算9ms以当前速度能传输的数据量为多大
-
-	if (num_trans == info_tmp.info_num) {
-		std::cout << "一次传输刚好完成"<< std::endl;	
-		dispached.time = 9.0;
-		dispached.info_num = num_trans;
-	}
-	else if (num_trans > info_tmp.info_num) {
-		std::cout << "传输能力大于需求" << std::endl;
-		double time = info_tmp.info_num * 8.0 * 512.0 * 1000 / 1000000.0 / info_tmp.info_speed;//保存为ms
-		dispached.time = time;
-		dispached.info_num = info_tmp.info_num;
-	}
-	else {
-		std::cout << "一次传输不完，此次传输数据量" << num_trans << "剩余：" << info_tmp.info_num - num_trans << std::endl;
-		info_tmp.info_num = info_tmp.info_num - num_trans;//剩下的信息量
-		dispached.info_num = num_trans;
-		dispached.time = 9.0;
-		//更新缓冲区队首的信息
-		std::uniform_int_distribution<int> random_un(1, 8);//随机一个速度值
-		channel_speed = speed[random_un(random) - 1] * (channel_space / 5.0);
-		info_tmp.info_speed = channel_speed * 4;
-		info_produce.push_front(info_tmp);
-	}
-	info_dispached.push_back(dispached);
-}
-
-void STA::getDispach_f2(double &timeleft)
+void STA::getDispach(double &timeleft)
 {
 	//先调度1ms
 	Info info_tmp;
